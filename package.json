@@ -1,0 +1,51 @@
+{
+  "name": "@trustplane/auth-sdk",
+  "version": "0.0.0",
+  "description": "TypeScript caller SDK for TrustPlane Auth request signing.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "author": "TrustPlane",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/trustplane-dev/trustplane-auth-sdk-js.git"
+  },
+  "bugs": {
+    "url": "https://github.com/trustplane-dev/trustplane-auth-sdk-js/issues"
+  },
+  "homepage": "https://github.com/trustplane-dev/trustplane-auth-sdk-js#readme",
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "SECURITY.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "npm run typecheck",
+    "pack:dry-run": "npm pack --dry-run",
+    "scan:leaks": "sh scripts/scan-leaks.sh",
+    "scan:wording": "sh scripts/scan-wording.sh",
+    "smoke:pack": "sh scripts/smoke-packed-tarball.sh",
+    "test": "node --test --import tsx test/*.test.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.11",
+    "tsx": "^4.16.2",
+    "typescript": "^5.5.3"
+  }
+}
