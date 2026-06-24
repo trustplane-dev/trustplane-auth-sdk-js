@@ -43,12 +43,16 @@ The workflow verifies that the remote git tag does not already exist and that `n
 
 Publishing requires npm trusted publishing with provenance from GitHub Actions.
 
+The release workflow uses Node.js `22.14.0` and installs npm `^11.5.1` before any release checks. npm trusted publishing requires Node.js `>=22.14.0` and npm `>=11.5.1`; the workflow prints both versions and fails before publishing if either tool is too old.
+
 Before setting `publish_package=true`, configure npm trusted publishing for:
 
 - package: `@trustplane/auth-sdk`
 - owner/repository: `trustplane-dev/trustplane-auth-sdk-js`
 - workflow: `release-npm.yml`
 - environment/tag policy: match the release policy chosen for the preview
+- branch/ref policy: `main`
+- allowed action: `npm publish`
 
 The workflow uses:
 
@@ -57,6 +61,8 @@ npm publish --access public --provenance
 ```
 
 If OIDC/trusted publishing is not available, the workflow must fail. Do not fall back to a long-lived npm token without a separate security review.
+
+npm trusted publishing is configured manually in npm package settings before `publish_package=true`. The CLI cannot currently prove this configuration ahead of time for an unpublished package.
 
 ## No-Overwrite Rules
 
