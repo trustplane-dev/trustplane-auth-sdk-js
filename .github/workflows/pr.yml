@@ -1,0 +1,44 @@
+name: PR
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: install
+        run: npm ci
+      - name: typecheck
+        run: npm run typecheck
+      - name: lint
+        run: npm run lint
+      - name: test
+        run: npm test
+      - name: build
+        run: npm run build
+      - name: pack dry-run
+        run: npm pack --dry-run
+      - name: clean packed import smoke
+        run: npm run smoke:pack
+      - name: leak scan
+        run: npm run scan:leaks
+      - name: premature wording scan
+        run: npm run scan:wording
+      - name: shell syntax
+        run: for f in scripts/*.sh; do sh -n "$f"; done
+      - name: workflow yaml parse
+        run: ruby -e 'require "yaml"; Dir[".github/workflows/*.yml"].each { |f| YAML.load_file(f) }'
+      - name: diff check
+        run: git diff --check
