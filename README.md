@@ -20,6 +20,10 @@ Do not install from npm yet. Until a release exists, test this repository throug
 
 The npm package candidate is `@trustplane/auth-sdk`.
 
+## Runtime Support
+
+This preview package is Node-only because signing uses `node:crypto`. It does not claim browser or edge-runtime support.
+
 ## Minimal Transcript Example
 
 ```ts
