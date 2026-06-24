@@ -1,0 +1,135 @@
+name: Manual npm Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Semver tag to prepare, for example v0.1.0-rc.1
+        required: true
+        type: string
+      publish_package:
+        description: Publish to npm, create the release commit, and push the annotated tag
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  id-token: write
+
+env:
+  PACKAGE_NAME: "@trustplane/auth-sdk"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require main
+        run: |
+          if [ "${GITHUB_REF_NAME}" != "main" ]; then
+            echo "release workflow must run from main"
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          registry-url: https://registry.npmjs.org
+      - name: Configure release git identity
+        run: |
+          git config user.name "Medh Mesh"
+          git config user.email "maintainer@trustplane.dev"
+      - name: Validate version input
+        run: |
+          if ! printf '%s\n' "${{ inputs.version }}" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$'; then
+            echo "version must look like v0.1.0 or v0.1.0-rc.1"
+            exit 1
+          fi
+          package_version="${{ inputs.version }}"
+          package_version="${package_version#v}"
+          echo "PACKAGE_VERSION=$package_version" >> "$GITHUB_ENV"
+      - name: Refuse existing remote tag
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/${{ inputs.version }}" >/dev/null 2>&1; then
+            echo "tag already exists: ${{ inputs.version }}"
+            exit 1
+          fi
+      - name: Refuse existing npm version
+        run: |
+          if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version >/dev/null 2>&1; then
+            echo "npm version already exists: $PACKAGE_NAME@$PACKAGE_VERSION"
+            exit 1
+          fi
+      - name: Install
+        run: npm ci
+      - name: Test
+        run: npm test
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Build
+        run: npm run build
+      - name: Packed smoke
+        run: npm run smoke:pack
+      - name: Leak scan
+        run: npm run scan:leaks
+      - name: Premature wording scan
+        run: npm run scan:wording
+      - name: Pack dry-run
+        run: npm pack --dry-run
+      - name: Set package version
+        run: npm version "$PACKAGE_VERSION" --no-git-tag-version
+      - name: Rebuild versioned package
+        run: npm run build
+      - name: Pack versioned tarball
+        run: |
+          pack_json=$(npm pack --json)
+          printf '%s\n' "$pack_json"
+          tarball=$(printf '%s\n' "$pack_json" | node -e 'let data = ""; process.stdin.on("data", chunk => data += chunk); process.stdin.on("end", () => { const parsed = JSON.parse(data); console.log(parsed[0].filename); });')
+          echo "TARBALL=$tarball" >> "$GITHUB_ENV"
+      - name: Clean install/import smoke
+        run: sh scripts/smoke-npm-tarball.sh "$TARBALL"
+      - name: Dry-run summary
+        if: ${{ inputs.publish_package == false }}
+        run: |
+          {
+            echo "### npm release readiness complete"
+            echo
+            echo "Prepared and smoke-tested $PACKAGE_NAME@$PACKAGE_VERSION from $TARBALL."
+            echo
+            echo "publish_package=false, so this run did not create a commit, tag, npm publish, or GitHub Release."
+            echo
+            echo "To publish later, rerun from main with publish_package=true after npm trusted publishing is configured for this package."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Require npm trusted publishing
+        if: ${{ inputs.publish_package }}
+        run: |
+          if [ -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ] || [ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ]; then
+            echo "npm trusted publishing/OIDC is not available to this job."
+            echo "Configure npm trusted publishing for $PACKAGE_NAME and keep id-token: write enabled."
+            exit 1
+          fi
+      - name: Publish package
+        if: ${{ inputs.publish_package }}
+        run: npm publish "$TARBALL" --access public --provenance
+      - name: Commit version, tag, and push
+        if: ${{ inputs.publish_package }}
+        run: |
+          git add package.json package-lock.json
+          git commit -m "Release TypeScript SDK ${{ inputs.version }}"
+          git tag -a "${{ inputs.version }}" -m "TrustPlane Auth TypeScript SDK ${{ inputs.version }}"
+          git push origin "HEAD:main" "refs/tags/${{ inputs.version }}"
+      - name: Publish summary
+        if: ${{ inputs.publish_package }}
+        run: |
+          {
+            echo "### npm release published"
+            echo
+            echo "Published $PACKAGE_NAME@$PACKAGE_VERSION with provenance from $TARBALL."
+            echo
+            echo "No GitHub Release was created by this workflow. Create a draft release in the follow-up release task after npm verification succeeds."
+            echo
+            echo "Recovery note: npm publish runs before git push. If npm publish fails, there is no release commit or tag to repair. If git push fails after npm publish, do not republish or overwrite npm; repair the git commit/tag publication from the same workflow commit and package version."
+          } >> "$GITHUB_STEP_SUMMARY"

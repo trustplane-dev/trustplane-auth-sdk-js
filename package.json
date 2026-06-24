@@ -5,6 +5,14 @@
   "type": "module",
   "license": "Apache-2.0",
   "author": "TrustPlane",
+  "keywords": [
+    "trustplane",
+    "auth",
+    "sdk",
+    "request-signing",
+    "ed25519",
+    "node"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/trustplane-dev/trustplane-auth-sdk-js.git"
