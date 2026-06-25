@@ -16,6 +16,13 @@ TrustPlane release tags use a leading `v`. npm package versions do not.
 
 - TrustPlane tag: `v0.1.0-rc.1`
 - npm package version: `0.1.0-rc.1`
+- npm dist-tag: `rc`
+
+Stable releases use the `latest` dist-tag:
+
+- TrustPlane tag: `v0.1.0`
+- npm package version: `0.1.0`
+- npm dist-tag: `latest`
 
 The repository keeps `package.json` at `0.0.0` until the manual release workflow prepares a versioned release commit.
 
@@ -39,6 +46,8 @@ Default behavior is release-readiness only:
 
 The workflow verifies that the remote git tag does not already exist and that `npm view @trustplane/auth-sdk@<version>` does not already resolve before it prepares a tarball.
 
+The workflow derives the npm dist-tag from the package version. Versions containing `-rc.` publish with dist-tag `rc`; stable versions publish with dist-tag `latest`. Never publish prerelease versions with `latest`.
+
 ## Trusted Publishing
 
 Publishing requires npm trusted publishing with provenance from GitHub Actions.
@@ -57,7 +66,7 @@ Before setting `publish_package=true`, configure npm trusted publishing for:
 The workflow uses:
 
 ```sh
-npm publish --access public --provenance
+npm publish --access public --provenance --tag <dist-tag>
 ```
 
 If OIDC/trusted publishing is not available, the workflow must fail. Do not fall back to a long-lived npm token without a separate security review.
@@ -91,6 +100,8 @@ If npm publish succeeds but the later git push fails:
 5. Record the repair in the release notes for reviewer visibility.
 
 If npm publish succeeded but later verification failed, do not unpublish except under npm security-policy guidance. Prefer a fixed prerelease version.
+
+Workflow run `28151143386` failed safely before npm publish, release commit, or tag creation because npm requires an explicit dist-tag for prerelease versions. The fix is to publish `0.1.0-rc.1` with dist-tag `rc`, not `latest`.
 
 ## Verification After Publish
 

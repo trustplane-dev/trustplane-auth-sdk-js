@@ -82,6 +82,14 @@ jobs:
           package_version="${{ inputs.version }}"
           package_version="${package_version#v}"
           echo "PACKAGE_VERSION=$package_version" >> "$GITHUB_ENV"
+      - name: Resolve npm dist-tag
+        run: |
+          case "$PACKAGE_VERSION" in
+            *-rc.*) npm_dist_tag=rc ;;
+            *) npm_dist_tag=latest ;;
+          esac
+          echo "NPM_DIST_TAG=$npm_dist_tag" >> "$GITHUB_ENV"
+          echo "npm dist-tag: $npm_dist_tag"
       - name: Refuse existing remote tag
         run: |
           if git ls-remote --exit-code --tags origin "refs/tags/${{ inputs.version }}" >/dev/null 2>&1; then
@@ -130,6 +138,8 @@ jobs:
             echo
             echo "Prepared and smoke-tested $PACKAGE_NAME@$PACKAGE_VERSION from $TARBALL."
             echo
+            echo "npm dist-tag: $NPM_DIST_TAG"
+            echo
             echo "publish_package=false, so this run did not create a commit, tag, npm publish, or GitHub Release."
             echo
             echo "To publish later, rerun from main with publish_package=true after npm trusted publishing is configured for this package."
@@ -144,7 +154,7 @@ jobs:
           fi
       - name: Publish package
         if: ${{ inputs.publish_package }}
-        run: npm publish "$TARBALL" --access public --provenance
+        run: npm publish "$TARBALL" --access public --provenance --tag "$NPM_DIST_TAG"
       - name: Commit version, tag, and push
         if: ${{ inputs.publish_package }}
         run: |
@@ -159,6 +169,8 @@ jobs:
             echo "### npm release published"
             echo
             echo "Published $PACKAGE_NAME@$PACKAGE_VERSION with provenance from $TARBALL."
+            echo
+            echo "npm dist-tag: $NPM_DIST_TAG"
             echo
             echo "No GitHub Release was created by this workflow. Create a draft release in the follow-up release task after npm verification succeeds."
             echo
