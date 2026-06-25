@@ -1,6 +1,6 @@
 {
   "name": "@trustplane/auth-sdk",
-  "version": "0.0.0",
+  "version": "0.1.0-rc.1",
   "description": "TypeScript caller SDK for TrustPlane Auth request signing.",
   "type": "module",
   "license": "Apache-2.0",
