@@ -73,6 +73,28 @@ If OIDC/trusted publishing is not available, the workflow must fail. Do not fall
 
 npm trusted publishing is configured manually in npm package settings before `publish_package=true`. The CLI cannot currently prove this configuration ahead of time for an unpublished package.
 
+## First-Package Bootstrap
+
+`@trustplane/auth-sdk` may need one initial npm publish before npm package-level trusted publishing settings can be attached. The release workflow includes a narrowly scoped bootstrap mode for that first package creation only:
+
+- `bootstrap_with_npm_token=true`
+- `publish_package=true`
+- prerelease versions only, currently versions containing `-rc.`
+- requires the `NPM_TOKEN` GitHub Actions secret
+- still publishes with provenance and the computed npm dist-tag
+- still publishes before any release commit or tag is pushed
+
+Bootstrap token mode must not be used for stable `latest` releases. It is only for the first prerelease package creation when package-level trusted publishing cannot yet be configured because the npm package does not exist.
+
+After a successful bootstrap publish:
+
+1. Revoke the temporary npm token immediately.
+2. Configure npm trusted publishing for `@trustplane/auth-sdk` in npm package settings.
+3. Remove or leave disabled the `NPM_TOKEN` repository secret according to the release operator's security policy.
+4. Use the normal trusted-publishing path for future releases with `bootstrap_with_npm_token=false`.
+
+Do not fall back to token mode for routine release failures once the package exists.
+
 ## No-Overwrite Rules
 
 - Never reuse an npm version after `npm view @trustplane/auth-sdk@<version>` resolves.

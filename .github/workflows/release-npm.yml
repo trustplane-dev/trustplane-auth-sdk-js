@@ -12,6 +12,11 @@ on:
         required: true
         default: false
         type: boolean
+      bootstrap_with_npm_token:
+        description: One-time first-package bootstrap using the NPM_TOKEN secret; prerelease only
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -90,6 +95,26 @@ jobs:
           esac
           echo "NPM_DIST_TAG=$npm_dist_tag" >> "$GITHUB_ENV"
           echo "npm dist-tag: $npm_dist_tag"
+      - name: Validate bootstrap mode
+        if: ${{ inputs.bootstrap_with_npm_token }}
+        run: |
+          if [ "${{ inputs.publish_package }}" != "true" ]; then
+            echo "bootstrap_with_npm_token=true requires publish_package=true"
+            exit 1
+          fi
+          case "$PACKAGE_VERSION" in
+            *-rc.*) ;;
+            *)
+              echo "bootstrap_with_npm_token is only allowed for prerelease versions containing -rc."
+              exit 1
+              ;;
+          esac
+          if [ -z "${NPM_TOKEN:-}" ]; then
+            echo "bootstrap_with_npm_token=true requires the NPM_TOKEN GitHub Actions secret"
+            exit 1
+          fi
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Refuse existing remote tag
         run: |
           if git ls-remote --exit-code --tags origin "refs/tags/${{ inputs.version }}" >/dev/null 2>&1; then
@@ -145,16 +170,21 @@ jobs:
             echo "To publish later, rerun from main with publish_package=true after npm trusted publishing is configured for this package."
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Require npm trusted publishing
-        if: ${{ inputs.publish_package }}
+        if: ${{ inputs.publish_package && !inputs.bootstrap_with_npm_token }}
         run: |
           if [ -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ] || [ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ]; then
             echo "npm trusted publishing/OIDC is not available to this job."
             echo "Configure npm trusted publishing for $PACKAGE_NAME and keep id-token: write enabled."
             exit 1
           fi
-      - name: Publish package
-        if: ${{ inputs.publish_package }}
+      - name: Publish package with trusted publishing
+        if: ${{ inputs.publish_package && !inputs.bootstrap_with_npm_token }}
         run: npm publish "$TARBALL" --access public --provenance --tag "$NPM_DIST_TAG"
+      - name: Bootstrap publish package with npm token
+        if: ${{ inputs.publish_package && inputs.bootstrap_with_npm_token }}
+        run: npm publish "$TARBALL" --access public --provenance --tag "$NPM_DIST_TAG"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Commit version, tag, and push
         if: ${{ inputs.publish_package }}
         run: |
@@ -172,6 +202,10 @@ jobs:
             echo
             echo "npm dist-tag: $NPM_DIST_TAG"
             echo
+            if [ "${{ inputs.bootstrap_with_npm_token }}" = "true" ]; then
+              echo "Bootstrap token mode was used. Revoke the npm token and configure npm trusted publishing for future releases."
+              echo
+            fi
             echo "No GitHub Release was created by this workflow. Create a draft release in the follow-up release task after npm verification succeeds."
             echo
             echo "Recovery note: npm publish runs before git push. If npm publish fails, there is no release commit or tag to repair. If git push fails after npm publish, do not republish or overwrite npm; repair the git commit/tag publication from the same workflow commit and package version."
